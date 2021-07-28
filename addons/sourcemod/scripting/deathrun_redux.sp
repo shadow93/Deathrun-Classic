@@ -193,7 +193,11 @@ public void OnMapStart()
 	{
 		LogMessage("Deathrun map detected. Enabling Deathrun Gamemode.");
 		isValidDrMap = true;
-		Steam_SetGameDescription("DeathRun Classic");
+		
+		char gameDesc[PLATFORM_MAX_PATH];
+		FormatEx(gameDesc, sizeof(gameDesc), "Deathrun Classic (%s)", DR_VERSION);
+		Steam_SetGameDescription(gameDesc);
+		
 		AddServerTag("deathrun");
 		for (int i = 1; i <= MaxClients; i++)
 		{
