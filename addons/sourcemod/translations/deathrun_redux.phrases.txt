@@ -26,7 +26,7 @@
 	{
 		"en"		"You cannot suicide or change teams as death!"
 		"es"		"¡No puedes suicidarte or cambiar equipo como la Muerte!"
-	}teleported you to
+	}
 	"Death Enabled" // Notify players that they can be selected as death
 	{
 		"en"		"You can be selected as death!"
