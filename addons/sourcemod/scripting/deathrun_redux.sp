@@ -1527,7 +1527,7 @@ stock bool IsPlayerStuck(int client)
 
 public bool IsTracedFilterNotSelf(int entity, int contentsMask, any client)
 {
-	if(entity == client)
+	if(entity == client || IsValidClient(entity))
 	{
 		return false;
 	}
