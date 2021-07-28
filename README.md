@@ -15,9 +15,7 @@ This build has an option for checking for stuck players.
 
 2 - teleport to last location
 
-3 - teleport to random runner
-
-4 - respawn (for maps without a motivator)
+3 - respawn (for maps without a motivator)
 
 ```
 "deathrun"
