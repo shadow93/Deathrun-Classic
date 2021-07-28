@@ -26,7 +26,7 @@
 	{
 		"en"		"You cannot suicide or change teams as death!"
 		"es"		"¡No puedes suicidarte or cambiar equipo como la Muerte!"
-	}
+	}teleported you to
 	"Death Enabled" // Notify players that they can be selected as death
 	{
 		"en"		"You can be selected as death!"
@@ -56,5 +56,20 @@
 	{
 		"en"		"A minimum of two players is required to start Deathrun!"
 		"es"		"¡Deathrun requiere un minimo de dos jugadores para iniciar!"
+	}
+	"Teleported To Last Location"
+	{
+		"en"		"You were stuck so we teleported you to your previous location!"
+		"es"		"¡Estuviste atascado, así que te teletransportamos a tu ubicacion anterior!"
+	}
+	"Teleported To Random Runner"
+	{
+		"en"		"You were stuck so we teleported you to a random runner!"
+		"es"		"¡Estuviste atascado, así que te teletransportamos a un corredor aleatorio!"
+	}
+	"Teleported To Spawn"
+	{
+		"en"		"You were stuck so you were respawned!"
+		"es"		"¡Estuviste atascado, así que te regeneraste!"
 	}
 }

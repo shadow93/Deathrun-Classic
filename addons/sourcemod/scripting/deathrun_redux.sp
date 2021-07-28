@@ -1496,11 +1496,14 @@ public Action OnTouch(int client, int other)
 
 stock void HandleStuckPlayer(int client, int action, float location[3])
 {
-	PrintHintText(client, "The anti-stuck detection code is working as intended!");
 	switch(action)
 	{
 		case 1: ForcePlayerSuicide(client); // slay player
-		case 2:	TeleportEntity(client, location, NULL_VECTOR, NULL_VECTOR); // teleport to previous location
+		case 2:	// teleport to previous location
+		{
+			TeleportEntity(client, location, NULL_VECTOR, NULL_VECTOR);
+			PrintHintText(client, "%t", "Teleported To Last Location");
+		}
 		case 3:	// teleport to random runner
 		{
 			int target=GetRandomInt(1, MaxClients);
@@ -1511,9 +1514,14 @@ stock void HandleStuckPlayer(int client, int action, float location[3])
 			float tLoc[3];
 			GetEntPropVector(target, Prop_Send, "m_vecOrigin", tLoc);
 			TeleportEntity(client, tLoc, NULL_VECTOR, NULL_VECTOR);
+			PrintHintText(client, "%t", "Teleported To Random Runner");
 		
 		}
-		case 4: TF2_RespawnPlayer(client); // respawn if no motivator
+		case 4: // respawn if no motivator
+		{
+			TF2_RespawnPlayer(client); 
+			PrintHintText(client, "%t", "Teleported To Spawn");
+		}
 	}
 }
 
