@@ -62,11 +62,6 @@
 		"en"		"You were stuck so we teleported you to your previous location!"
 		"es"		"¡Estuviste atascado, así que te teletransportamos a tu ubicacion anterior!"
 	}
-	"Teleported To Random Runner"
-	{
-		"en"		"You were stuck so we teleported you to a random runner!"
-		"es"		"¡Estuviste atascado, así que te teletransportamos a un corredor aleatorio!"
-	}
 	"Teleported To Spawn"
 	{
 		"en"		"You were stuck so you were respawned!"
