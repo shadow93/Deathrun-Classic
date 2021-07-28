@@ -6,7 +6,6 @@
 
 This build has an option for checking for stuck players.
 
-There are 2 config options for this:
 
 ## HandleStuckPlayers
 
