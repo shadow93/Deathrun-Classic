@@ -3,6 +3,7 @@
 ## Currently Testing
 
 - Stuck Player Checker - it will automatically detect if a player is stuck!
+- Replace SteamTools with SteamWorks for setting game description!
 - Show version number on game description
 
 This build has an option for checking for stuck players.
