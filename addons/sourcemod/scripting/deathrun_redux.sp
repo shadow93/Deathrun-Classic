@@ -7,7 +7,7 @@
 #include <sdkhooks>
 #include <tf2_stocks>
 #include <tf2items>
-#include <steamtools>
+#include <SteamWorks>
 #include <clientprefs>
 
 #pragma newdecls required
@@ -196,7 +196,7 @@ public void OnMapStart()
 		
 		char gameDesc[PLATFORM_MAX_PATH];
 		FormatEx(gameDesc, sizeof(gameDesc), "Deathrun Classic (%s)", DR_VERSION);
-		Steam_SetGameDescription(gameDesc);
+		SteamWorks_SetGameDescription(gameDesc);
 		
 		AddServerTag("deathrun");
 		for (int i = 1; i <= MaxClients; i++)
@@ -213,7 +213,7 @@ public void OnMapStart()
 	{
 		LogMessage("Current map is not a deathrun map. Disabling Deathrun Gamemode.");
 		isValidDrMap = false;
-		Steam_SetGameDescription("Team Fortress");	
+		SteamWorks_SetGameDescription("Team Fortress");	
 		RemoveServerTag("deathrun");
 	}
 }
