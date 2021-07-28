@@ -13,7 +13,7 @@
 #pragma newdecls required
 
 // ---- Defines ----------------------------------------------------------------
-#define DR_VERSION "0.3a"
+#define DR_VERSION "0.3b"
 #define PLAYERCOND_SPYCLOAK (1<<4)
 #define MAXGENERIC 25	//Used as a limit in the config file
 
@@ -937,6 +937,7 @@ public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 			SetEntityMoveType(client, MOVETYPE_NONE);
 			
 		SDKHook(client, SDKHook_PreThink, GameLogic_Prethink);
+		SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage);
 	}
 	return Plugin_Continue;
 }
@@ -957,6 +958,7 @@ public Action OnPlayerDeath(Handle event, const char[] name, bool dontBroadcast)
 		{
 			SetEntProp(client, Prop_Send, "m_bGlowEnabled", 0);
 			SDKUnhook(client, SDKHook_PreThink, GameLogic_Prethink);
+			SDKUnhook(client, SDKHook_OnTakeDamage, OnTakeDamage);
 			
 			if(GetClientTeam(client) == RUNNERS && aliveRunners > 1)
 				EmitRandomSound(g_SndOnDeath,client);
@@ -1205,9 +1207,9 @@ public void GameLogic_Prethink(int client)
 
 public Action OnTakeDamage(int client, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
-	if(isValidDrMap && blockFallDamage && (attacker<1 || client==attacker) && damagetype & DMG_FALL) // cancel fall damage
+	if(isValidDrMap && blockFallDamage && (damagetype & DMG_FALL)) // cancel fall damage
 	{
-		return Plugin_Handled;
+		return Plugin_Stop;
 	}
 	return Plugin_Continue;
 }
