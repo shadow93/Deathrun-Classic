@@ -2,7 +2,8 @@
 
 ## Currently Testing
 
-- Stuck Player Checker
+- Stuck Player Checker - it will automatically detect if a player is stuck!
+
 This build has an option for checking for stuck players.
 
 There are 2 config options for this:
@@ -19,10 +20,6 @@ There are 2 config options for this:
 
 4 - respawn (for maps without a motivator)
 
-## StuckPlayerTimeout
-
-This is a float value which runs the checker every X seconds if HandleStuckPlayers is enabled
-
 ```
 "deathrun"
 {
@@ -33,7 +30,6 @@ This is a float value which runs the checker every X seconds if HandleStuckPlaye
 		"BlockDeathSuicide"	"1"	//This prevents death from suiciding
 		
 		"HandleStuckPlayers" "1" // Checks for stuck players and takes action if someone is stuck. 0 = disable, 1 = slay, 2 = tele to prev location, 3 = tele to random runner, 4 = respawn
-		"StuckPlayerTimeout" "5.0" // Check for stuck players every X seconds
 		
 		//Speed of every team (for reference, pyro's base speed is 300).
 		"speed"
