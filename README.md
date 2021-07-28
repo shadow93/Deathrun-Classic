@@ -1,7 +1,7 @@
 # Deathrun-Classic
 ### A continuation of ClassicGuzzi's Deahtrun Redux plugin
 
-###Main features:
+### Main features:
 - Global configuration file (data/deathrun/deathrun/cfg) or map-specific configuration (data/deathrun/maps/<mapname>.cfg)
 - Configurable speeds for the activator (Death) and the runners!
 - Melee-only mode can be enabled
@@ -14,7 +14,7 @@
 - Death cannot suicide!
 - Auto-detects deathrun maps!
 
-###Dependencies:
+### Dependencies:
 - TF2Items (for weapon restrictions)
 - SteamTools (for game name change in server browser)
 
