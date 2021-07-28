@@ -23,7 +23,7 @@
 ### Installation:
 - deathrun_redux.smx > tf/addons/sourcemod/plugins
 - deathrun.cfg > tf/addons/sourcemod/data/deathrun
-- <map name>.cfg > tf/addons/sourcemod/data/deathrun/maps/
+- [map name].cfg > tf/addons/sourcemod/data/deathrun/maps/
 
 ## Global configuration
 ```
