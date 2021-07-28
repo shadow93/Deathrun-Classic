@@ -4,6 +4,7 @@
 ### Main features:
 - Global configuration file (data/deathrun/deathrun/cfg) or map-specific configuration (data/deathrun/maps/<mapname>.cfg)
 - Configurable speeds for the activator (Death) and the runners!
+- Uses TF2 notification hud announcements, alongside chat announcements for events.
 - Melee-only mode can be enabled
 - Fall damage can be disabled (no TF2Attributes dependency!)
 - Enable outlines on runners / death based on living runners globally
@@ -11,7 +12,8 @@
 - Players won't be able to push others
 - Death cannot be selected twice, unless everyone was death at least once.
 - !drtoggle to toggle between wanting to be death, skip being death globally, or skip being death for a specific map
-- Death cannot suicide!
+- Option to prevent death from suiciding
+- Added translation file for multi-language support
 - Auto-detects deathrun maps!
 
 ### Dependencies:
