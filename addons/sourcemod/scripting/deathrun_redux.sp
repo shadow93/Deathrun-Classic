@@ -13,7 +13,7 @@
 #pragma newdecls required
 
 // ---- Defines ----------------------------------------------------------------
-#define DR_VERSION "0.3a"
+#define DR_VERSION "0.3.1"
 #define PLAYERCOND_SPYCLOAK (1<<4)
 #define MAXGENERIC 25	//Used as a limit in the config file
 
@@ -26,6 +26,7 @@
 #define DBD_THISMAP 3 // The cookie will never have this value
 #define TIME_TO_ASK 30.0 //Delay between asking the client its preferences and it's connection/join.
 
+#define INACTIVE 100000000.0
 
 // ---- Variables --------------------------------------------------------------
 
@@ -40,6 +41,10 @@ bool multicommandHooked = false;
 bool blockDeathSuicide = true;
 int g_timesplayed_asdeath[MAXPLAYERS+1];
 int previousDeath = -1;
+
+int gCheckStuckPlayers = 1;
+float StuckCheckTimeout[MAXPLAYERS+1]=INACTIVE;
+float gStuckCheckTimeout=5.0;
 
 bool OnStartCountdown = false;
 int g_dontBeDeath[MAXPLAYERS+1] = {DBD_UNDEF,...};
@@ -98,9 +103,9 @@ int dr_push_def = 0;
 // ---- Plugin's Information ---------------------------------------------------
 public Plugin myinfo =
 {
-	name = "[TF2] Deathrun Redux",
+	name = "[TF2] Deathrun Classic",
 	author = "93SHADoW, Classic",
-	description	= "Deathrun plugin for TF2",
+	description	= "A deathrun plugin for TF2",
 	version = DR_VERSION,
 	url = "http://www.clangs.com.ar"
 };
@@ -157,6 +162,9 @@ public void OnPluginStart()
 	
 	//Block administrator's end of round sounds
 	HookEvent("teamplay_broadcast_audio", OnBroadcast, EventHookMode_Pre);
+	
+	//End of round events
+	HookEvent("arena_win_panel", OnWinPanel, EventHookMode_Pre);
 }
 
 /* OnPluginEnd()
@@ -273,6 +281,13 @@ void LoadConfigs()
 	{
 		blockFallDamage = view_as<bool>(KvGetNum(hDR, "DisableFallDamage", view_as<int>(blockFallDamage)));
 		blockDeathSuicide = view_as<bool>(KvGetNum(hDR, "BlockDeathSuicide", view_as<int>(blockDeathSuicide)));
+		
+		gCheckStuckPlayers = KvGetNum(hDR, "HandleStuckPlayers", gCheckStuckPlayers);
+		if(gCheckStuckPlayers)
+		{
+			gStuckCheckTimeout = KvGetFloat(hDR, "StuckPlayerTimeout", gStuckCheckTimeout);
+		}
+		
 		if(KvJumpToKey(hDR,"speed"))
 		{
 			runnerSpeed = KvGetFloat(hDR,"runners",runnerSpeed);
@@ -742,6 +757,14 @@ public Action OnBroadcast(Event event, const char[] name, bool dontBroadcast)
 	return Plugin_Continue;
 }
 
+public Action OnWinPanel(Event event, const char[] name, bool dontBroadcast)
+{
+	//if(isValidDrMap)
+		//return Plugin_Handled;
+	return Plugin_Continue;
+}
+
+
 /* TF2Items_OnGiveNamedItem_Post()
 **
 ** Here we check for the demoshield and the sapper.
@@ -933,10 +956,16 @@ public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 			CreateTimer(0.2, RespawnRebalanced,  GetClientUserId(client));
 		}
 		
-		if(OnStartCountdown)
-			SetEntityMoveType(client, MOVETYPE_NONE);
-			
 		SDKHook(client, SDKHook_PreThink, GameLogic_Prethink);
+		
+		if(OnStartCountdown)
+		{
+			SetEntityMoveType(client, MOVETYPE_NONE);
+		}
+		if(gCheckStuckPlayers)
+		{
+			StuckCheckTimeout[client]=GetEngineTime()+gStuckCheckTimeout; // start the stuck player timeout!
+		}
 	}
 	return Plugin_Continue;
 }
@@ -956,8 +985,9 @@ public Action OnPlayerDeath(Handle event, const char[] name, bool dontBroadcast)
 		if(IsValidClient(client,false)) // we want to make sure this is a valid client
 		{
 			SetEntProp(client, Prop_Send, "m_bGlowEnabled", 0);
+			StuckCheckTimeout[client]=INACTIVE;
 			SDKUnhook(client, SDKHook_PreThink, GameLogic_Prethink);
-			
+			StuckCheckTimeout[client]=INACTIVE;
 			if(GetClientTeam(client) == RUNNERS && aliveRunners > 1)
 				EmitRandomSound(g_SndOnDeath,client);
 			if(GetClientTeam(client) == RUNNERS && aliveRunners <= 1)
@@ -1189,7 +1219,14 @@ public void GameLogic_Prethink(int client)
 	{
 		SetEntPropFloat(client, Prop_Send, "m_flMaxspeed", GetClientTeam(client) == DEATH ? deathSpeed : runnerSpeed);
 		if(g_MeleeOnly && TF2_GetPlayerClass(client) == TFClass_Spy)
+		{
 			SetCloak(client, 1.0);
+		}
+		// here we check if a player is stuck or not
+		if(gCheckStuckPlayers) // only enable stuck player checking if cfg enables this!
+		{
+			CheckForStuckPlayer(client, GetEngineTime(), gCheckStuckPlayers);
+		}
 	}
 	else
 	{
@@ -1438,5 +1475,73 @@ stock bool ShowGameText(int client, const char[] icon="leaderboard_streak", int 
 	bf.WriteString(icon);
 	bf.WriteByte(color);
 	EndMessage();
+	return true;
+}
+
+/*
+** Here we check if a player got stuck and determine what action to do
+** 0 - disabled
+** 1 - slay player
+** 2 - teleport to last location
+** 3 - teleport to nearest player
+** 4 - respawn player (if a map doesn't have a motivator)
+*/
+stock void CheckForStuckPlayer(int client, float gameTime, int action)
+{
+	if(gameTime>=StuckCheckTimeout[client])
+	{
+		static float pLoc[3];
+		StuckCheckTimeout[client]+=gStuckCheckTimeout;
+		if (!IsPlayerStuck(client) && (GetEntityFlags(client) & FL_ONGROUND)) // capture previous location if target is on ground and not stuck!
+		{
+			GetEntPropVector(client, Prop_Send, "m_vecOrigin", pLoc);
+			return;
+		}
+		HandleStuckPlayer(client, action, pLoc);
+	}
+}
+
+stock void HandleStuckPlayer(int client, int action, float location[3])
+{
+	switch(action)
+	{
+		case 1: ForcePlayerSuicide(client); // slay player
+		case 2:	TeleportEntity(client, location, NULL_VECTOR, NULL_VECTOR); // teleport to previous location
+		case 3:	// teleport to random runner
+		{
+			int target=GetRandomInt(1, MaxClients);
+			while(!IsValidClient(target) || client==target || GetClientTeam(target)==DEATH || !(GetEntityFlags(client) & FL_ONGROUND))
+			{
+				target=GetRandomInt(1, MaxClients);
+			}
+			float tLoc[3];
+			GetEntPropVector(target, Prop_Send, "m_vecOrigin", tLoc);
+			TeleportEntity(client, tLoc, NULL_VECTOR, NULL_VECTOR);
+		
+		}
+		case 4: TF2_RespawnPlayer(client); // respawn if no motivator
+	}
+}
+
+stock bool IsPlayerStuck(int client)
+{
+	if(GetEntityMoveType(client) == MOVETYPE_NONE) // if a trap sets this or is preround, do not mark as stuck!
+		return false;
+	
+	float location[3], min[3], max[3];
+	GetEntPropVector(client, Prop_Send, "m_vecOrigin", location);
+	GetEntPropVector(client, Prop_Send, "m_vecMins", min);
+	GetEntPropVector(client, Prop_Send, "m_vecMaxs", max);
+	
+	TR_TraceHullFilter(location, location, min, max, MASK_SOLID, IsTracedFilterNotSelf, client);
+	return TR_DidHit(); // if a player is stuck, it will return true
+}
+
+public bool IsTracedFilterNotSelf(int entity, int contentsMask, any client)
+{
+	if(entity == client)
+	{
+		return false;
+	}
 	return true;
 }
