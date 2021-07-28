@@ -38,20 +38,19 @@ bool commandHooked = false;
 bool multicommandHooked = false;
 
 // player-specific
+static float pLoc[MAXPLAYERS+1][3];
 bool blockDeathSuicide = true;
 int g_timesplayed_asdeath[MAXPLAYERS+1];
 int previousDeath = -1;
 
 int gCheckStuckPlayers = 1;
-float StuckCheckTimeout[MAXPLAYERS+1]=INACTIVE;
-float gStuckCheckTimeout=5.0;
 
 bool OnStartCountdown = false;
 int g_dontBeDeath[MAXPLAYERS+1] = {DBD_UNDEF,...};
 bool g_canEmitSoundToDeath = true;
 
 //GenerealConfig
-bool blockFallDamage;
+bool blockFallDamage = true;
 float runnerSpeed;
 float deathSpeed;
 int g_runner_outline;
@@ -283,10 +282,6 @@ void LoadConfigs()
 		blockDeathSuicide = view_as<bool>(KvGetNum(hDR, "BlockDeathSuicide", view_as<int>(blockDeathSuicide)));
 		
 		gCheckStuckPlayers = KvGetNum(hDR, "HandleStuckPlayers", gCheckStuckPlayers);
-		if(gCheckStuckPlayers)
-		{
-			gStuckCheckTimeout = KvGetFloat(hDR, "StuckPlayerTimeout", gStuckCheckTimeout);
-		}
 		
 		if(KvJumpToKey(hDR,"speed"))
 		{
@@ -940,6 +935,7 @@ public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 		int client = GetClientOfUserId(GetEventInt(event, "userid"));
 		if(!IsValidClient(client, true))
 			return Plugin_Continue;
+		GetEntPropVector(client, Prop_Send, "m_vecOrigin", pLoc[client]);
 		if(g_MeleeOnly)
 		{
 			int cond = GetEntProp(client, Prop_Send, "m_nPlayerCond");
@@ -957,14 +953,12 @@ public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 		}
 		
 		SDKHook(client, SDKHook_PreThink, GameLogic_Prethink);
+		SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage);
+		SDKHook(client, SDKHook_Touch, OnTouch);
 		
 		if(OnStartCountdown)
 		{
 			SetEntityMoveType(client, MOVETYPE_NONE);
-		}
-		if(gCheckStuckPlayers)
-		{
-			StuckCheckTimeout[client]=GetEngineTime()+gStuckCheckTimeout; // start the stuck player timeout!
 		}
 	}
 	return Plugin_Continue;
@@ -985,9 +979,9 @@ public Action OnPlayerDeath(Handle event, const char[] name, bool dontBroadcast)
 		if(IsValidClient(client,false)) // we want to make sure this is a valid client
 		{
 			SetEntProp(client, Prop_Send, "m_bGlowEnabled", 0);
-			StuckCheckTimeout[client]=INACTIVE;
 			SDKUnhook(client, SDKHook_PreThink, GameLogic_Prethink);
-			StuckCheckTimeout[client]=INACTIVE;
+			SDKUnhook(client, SDKHook_OnTakeDamage, OnTakeDamage);
+			SDKUnhook(client, SDKHook_Touch, OnTouch);
 			if(GetClientTeam(client) == RUNNERS && aliveRunners > 1)
 				EmitRandomSound(g_SndOnDeath,client);
 			if(GetClientTeam(client) == RUNNERS && aliveRunners <= 1)
@@ -1222,11 +1216,6 @@ public void GameLogic_Prethink(int client)
 		{
 			SetCloak(client, 1.0);
 		}
-		// here we check if a player is stuck or not
-		if(gCheckStuckPlayers) // only enable stuck player checking if cfg enables this!
-		{
-			CheckForStuckPlayer(client, GetEngineTime(), gCheckStuckPlayers);
-		}
 	}
 	else
 	{
@@ -1242,9 +1231,9 @@ public void GameLogic_Prethink(int client)
 
 public Action OnTakeDamage(int client, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
-	if(isValidDrMap && blockFallDamage && (attacker<1 || client==attacker) && damagetype & DMG_FALL) // cancel fall damage
+	if(isValidDrMap && blockFallDamage && (damagetype & DMG_FALL)) // cancel fall damage
 	{
-		return Plugin_Handled;
+		return Plugin_Stop;
 	}
 	return Plugin_Continue;
 }
@@ -1486,23 +1475,28 @@ stock bool ShowGameText(int client, const char[] icon="leaderboard_streak", int 
 ** 3 - teleport to nearest player
 ** 4 - respawn player (if a map doesn't have a motivator)
 */
-stock void CheckForStuckPlayer(int client, float gameTime, int action)
+
+public Action OnTouch(int client, int other)
 {
-	if(gameTime>=StuckCheckTimeout[client])
+	if(gCheckStuckPlayers)
 	{
-		static float pLoc[3];
-		StuckCheckTimeout[client]+=gStuckCheckTimeout;
-		if (!IsPlayerStuck(client) && (GetEntityFlags(client) & FL_ONGROUND)) // capture previous location if target is on ground and not stuck!
+		if(IsPlayerStuck(client))
 		{
-			GetEntPropVector(client, Prop_Send, "m_vecOrigin", pLoc);
-			return;
+			HandleStuckPlayer(client, gCheckStuckPlayers, pLoc[client]);
+			return Plugin_Continue;
 		}
-		HandleStuckPlayer(client, action, pLoc);
+		if((GetEntityFlags(client) & FL_ONGROUND) && !(GetEntityMoveType(client) == MOVETYPE_NOCLIP))
+		{
+			GetEntPropVector(client, Prop_Send, "m_vecOrigin", pLoc[client]);
+		}
 	}
+	return Plugin_Continue;
 }
+
 
 stock void HandleStuckPlayer(int client, int action, float location[3])
 {
+	PrintHintText(client, "The anti-stuck detection code is working as intended!");
 	switch(action)
 	{
 		case 1: ForcePlayerSuicide(client); // slay player
@@ -1525,7 +1519,7 @@ stock void HandleStuckPlayer(int client, int action, float location[3])
 
 stock bool IsPlayerStuck(int client)
 {
-	if(GetEntityMoveType(client) == MOVETYPE_NONE) // if a trap sets this or is preround, do not mark as stuck!
+	if(GetEntityMoveType(client) == MOVETYPE_NONE || GetEntityMoveType(client) == MOVETYPE_NOCLIP || IsPlayerMoving(client)) // if a trap sets this, preround, or is moving do not mark as stuck!
 		return false;
 	
 	float location[3], min[3], max[3];
@@ -1533,13 +1527,25 @@ stock bool IsPlayerStuck(int client)
 	GetEntPropVector(client, Prop_Send, "m_vecMins", min);
 	GetEntPropVector(client, Prop_Send, "m_vecMaxs", max);
 	
-	TR_TraceHullFilter(location, location, min, max, MASK_SOLID, IsTracedFilterNotSelf, client);
+	TR_TraceHullFilter(location, location, min, max, MASK_PLAYERSOLID, IsTracedFilterNotSelf, client);
 	return TR_DidHit(); // if a player is stuck, it will return true
 }
 
 public bool IsTracedFilterNotSelf(int entity, int contentsMask, any client)
 {
 	if(entity == client)
+	{
+		return false;
+	}
+	return true;
+}
+
+stock bool IsPlayerMoving(int client)
+{
+	float vClientVelocity[3];
+	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vClientVelocity);
+	PrintCenterTextAll("Debug: X: %f, Y: %f, Z: %f", vClientVelocity[0],vClientVelocity[1],vClientVelocity[2]);
+	if(vClientVelocity[0]==0.0 && vClientVelocity[1]==0.0)
 	{
 		return false;
 	}
