@@ -1,0 +1,60 @@
+"Phrases"
+{
+	"Deathrun Start" // Announce the current Death
+	{
+		"#format" "{1:N}"
+		"en"		"{1} became Death!"
+		"es"		"¡{2} es la Muerte!"
+	}
+	"Become Death" // When a player becomes death
+	{
+		"en"		"You are Death! Good luck!"
+		"es"		"¡Eres la Muerte! ¡Buena Suerte!"
+	}
+	"Last Survivor"
+	{
+		"en"		"You are the last runner!"
+		"es"		"¡Eres el ultimo corredor!"
+	}
+	"Freerun" // When a player activates freerun!
+	{
+		"#format" "{1:N}"
+		"en"		"{1} has shown mercy and has granted you a freerun!"
+		"es"		"¡{1} ha dado una carrera libre!"
+	}
+	"Suicide Blocked" // Notify Death that they cannot suicide
+	{
+		"en"		"You cannot suicide or change teams as death!"
+		"es"		"¡No puedes suicidarte or cambiar equipo como la Muerte!"
+	}
+	"Death Enabled" // Notify players that they can be selected as death
+	{
+		"en"		"You can be selected as death!"
+		"es"		"¡Puedes ser eligido como la Muerte!"
+	}
+	"Death Disabled" // Notify players that they won't be selected as death
+	{
+		"en"		"You will no longer be selected as death! Changed your mind? Type !drtoggle"
+		"es"		"¡Ya no vas a ser eligido como la Muerte! ¿Cambiaste de opinion? Escriba !drtoggle"
+	}
+	"Death Disabled For Map"  // Notify players that they won't be selected as death for the current map
+	{
+		"en"		"You won't be selected as death for this map! Changed your mind? Type !drtoggle"
+		"es"		"¡No vas a ser eligido como la Muerte para este mapa! ¿Cambiaste de opinion? Escriba !drtoggle"
+	}
+	"Invalid Death"  // Invalid death found
+	{
+		"en"		"We couldn't find a valid player to become Death!"
+		"es"		"¡No hemos podido eligir un jugador valido para ser la Muerte"
+	}
+	"Death Not Connected"  // Invalid death found - not connected!
+	{
+		"en"		"The current Death isn't connected!"
+		"es"		"¡La Muerte actual no esta conectado a la partida!"
+	}
+	"Not Enough Players"
+	{
+		"en"		"A minimum of two players is required to start Deathrun!"
+		"es"		"¡Deathrun requiere un minimo de dos jugadores para iniciar!"
+	}
+}
