@@ -2,7 +2,7 @@
 ### A continuation of ClassicGuzzi's Deathrun Redux plugin
 
 ### Main features:
-- Global configuration file (data/deathrun/deathrun/cfg) or map-specific configuration (data/deathrun/maps/<mapname>.cfg)
+- Global configuration file (data/deathrun/deathrun/cfg) or map-specific configuration (data/deathrun/maps/[mapname].cfg)
 - Configurable speeds for the activator (Death) and the runners!
 - Uses TF2 notification hud announcements, alongside chat announcements for events.
 - Melee-only mode can be enabled
