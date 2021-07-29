@@ -33,24 +33,29 @@
 // map-specific
 bool isValidDrMap = false;
 
+// config values
+bool blockDeathSuicide = true;
+bool blockFallDamage = true;
+int gCheckStuckPlayers = 1;
+
+Handle gThirdPersonCmdCookie = INVALID_HANDLE;
+bool pThirdPerson[MAXPLAYERS+1]=false;
+bool gAllowThirdPerson=true;
+
 // for the command listener
 bool commandHooked = false;
 bool multicommandHooked = false;
 
 // player-specific
 static float pLoc[MAXPLAYERS+1][3];
-bool blockDeathSuicide = true;
 int g_timesplayed_asdeath[MAXPLAYERS+1];
 int previousDeath = -1;
-
-int gCheckStuckPlayers = 1;
 
 bool OnStartCountdown = false;
 int g_dontBeDeath[MAXPLAYERS+1] = {DBD_UNDEF,...};
 bool g_canEmitSoundToDeath = true;
 
 //GenerealConfig
-bool blockFallDamage = true;
 float runnerSpeed;
 float deathSpeed;
 int g_runner_outline;
@@ -99,6 +104,8 @@ int dr_scrambleauto_def = 0;
 int dr_airdash_def = 0;
 int dr_push_def = 0;
 
+bool debugMode;
+
 // ---- Plugin's Information ---------------------------------------------------
 public Plugin myinfo =
 {
@@ -117,7 +124,8 @@ public Plugin myinfo =
 public void OnPluginStart()
 {
 	//Cvars
-	CreateConVar("sm_dr_version", DR_VERSION, "Death Run Redux Version.", FCVAR_REPLICATED | FCVAR_SPONLY | FCVAR_DONTRECORD | FCVAR_NOTIFY);
+	CreateConVar("drc_version", DR_VERSION, "Deathrun Classic Version.", FCVAR_REPLICATED | FCVAR_SPONLY | FCVAR_DONTRECORD | FCVAR_NOTIFY);
+
 	//Creation of Tries
 	g_RestrictedWeps = CreateTrie();
 	g_AllClassWeps = CreateTrie();
@@ -147,14 +155,20 @@ public void OnPluginStart()
 	HookEvent("player_death", OnPlayerDeath, EventHookMode_Pre);
 	
 	//Preferences
-	g_DRCookie = RegClientCookie("DR_dontBeDeath", "Does the client want to be the Death?", CookieAccess_Private);
+	g_DRCookie = RegClientCookie("DR_dontBeDeath", "Does the client want to become Death?", CookieAccess_Private);
+	gThirdPersonCmdCookie = RegClientCookie("DR_thirdperson", "Client person view preferences", CookieAccess_Private);
+	
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!AreClientCookiesCached(i))
 			continue;
 		OnClientCookiesCached(i);
 	}
-	RegConsoleCmd( "drtoggle",  BeDeathMenu);
+	RegConsoleCmd("drtoggle", BeDeathMenu);
+	RegConsoleCmd("drtp", ToggleThirdPerson);
+	// for a smooth transition without having to use the old thirdperson plugin
+	RegConsoleCmd("tp", ToggleThirdPerson);
+	RegConsoleCmd("fp", ToggleThirdPerson);
 	
 	//Translations
 	LoadTranslations("deathrun_redux.phrases");
@@ -191,7 +205,7 @@ public void OnMapStart()
 	GetCurrentMap(mapname, sizeof(mapname));
 	if (strncmp(mapname, "dr_", 3, false) == 0 || strncmp(mapname, "deathrun_", 9, false) == 0 || strncmp(mapname, "vsh_dr_", 6, false) == 0 || strncmp(mapname, "vsh_deathrun_", 6, false) == 0)
 	{
-		LogMessage("Deathrun map detected. Enabling Deathrun Gamemode.");
+		LogMessage("[Deathrun Classic] Deathrun map detected. Enabling Deathrun Gamemode.");
 		isValidDrMap = true;
 		
 		char gameDesc[PLATFORM_MAX_PATH];
@@ -211,7 +225,7 @@ public void OnMapStart()
 	}
  	else
 	{
-		LogMessage("Current map is not a deathrun map. Disabling Deathrun Gamemode.");
+		LogMessage("[Deathrun Classic] Current map is not a deathrun map. Disabling Deathrun Gamemode.");
 		isValidDrMap = false;
 		SteamWorks_SetGameDescription("Team Fortress");	
 		RemoveServerTag("deathrun");
@@ -268,7 +282,6 @@ void LoadConfigs()
 	
 	char mainfile[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, mainfile, sizeof(mainfile), "data/deathrun/deathrun.cfg");
-	
 	if(!FileExists(mainfile))
 	{
 		SetFailState("Configuration file %s not found!", mainfile);
@@ -284,8 +297,9 @@ void LoadConfigs()
 	{
 		blockFallDamage = view_as<bool>(KvGetNum(hDR, "DisableFallDamage", view_as<int>(blockFallDamage)));
 		blockDeathSuicide = view_as<bool>(KvGetNum(hDR, "BlockDeathSuicide", view_as<int>(blockDeathSuicide)));
-		
+		debugMode = view_as<bool>(KvGetNum(hDR, "DebugMode", view_as<int>(debugMode)));
 		gCheckStuckPlayers = KvGetNum(hDR, "HandleStuckPlayers", gCheckStuckPlayers);
+		gAllowThirdPerson = view_as<bool>(KvGetNum(hDR, "AllowThirdPerson", gAllowThirdPerson));
 		
 		if(KvJumpToKey(hDR,"speed"))
 		{
@@ -479,7 +493,8 @@ void LoadConfigs()
 			return;
 		}
 		blockFallDamage = view_as<bool>(KvGetNum(hDR, "DisableFallDamage", view_as<int>(blockFallDamage)));
-
+		gCheckStuckPlayers = KvGetNum(hDR, "HandleStuckPlayers", gCheckStuckPlayers);
+		
 		if(KvJumpToKey(hDR,"speed"))
 		{
 			runnerSpeed = KvGetFloat(hDR,"runners",runnerSpeed);
@@ -635,11 +650,19 @@ public void OnClientCookiesCached(int client)
 	char sValue[8];
 	GetClientCookie(client, g_DRCookie, sValue, sizeof(sValue));
 	int nValue = StringToInt(sValue);
-
+	LogMessage("[Deathrun Classic] Loading DBDCookie: %N ,%i, %s", client, nValue, sValue);
 	if( nValue != DBD_OFF && nValue != DBD_ON) //If cookie is not valid we ask for a preference.
 		CreateTimer(TIME_TO_ASK, AskMenuTimer, client);
 	else //client has a valid cookie
 		g_dontBeDeath[client] = nValue;
+	LogMessage("[Deathrun Classic] Loaded DBDCookie: %N ,%i, %s", client, nValue, sValue);
+		
+	// now we check the player's thirdperson prefs
+	GetClientCookie(client, gThirdPersonCmdCookie, sValue, sizeof(sValue));
+	nValue = StringToInt(sValue);
+	LogMessage("[Deathrun Classic] Loading TPCookie %N, %i, %s", client,  nValue, sValue);
+	pThirdPerson[client] = view_as<bool>(nValue);
+	LogMessage("[Deathrun Classic] LoadedTPCookie %N & %b, %i, %s", client, pThirdPerson[client], nValue, sValue);
 }
 
 public Action AskMenuTimer(Handle timer, any client)
@@ -649,7 +672,7 @@ public Action AskMenuTimer(Handle timer, any client)
 
 public Action BeDeathMenu(int client,int args)
 {
-	if (client == 0 || (!IsClientInGame(client)))
+	if (!IsValidClient(client, false))
 	{
 		return Plugin_Handled;
 	}
@@ -674,7 +697,7 @@ public int BeDeathMenuHandler(Handle menu, MenuAction action, int client, int bu
 			char sPref[2];
 			IntToString(DBD_OFF, sPref, sizeof(sPref));
 			SetClientCookie(client, g_DRCookie, sPref);
-			CPrintToChat(client,"{black}[DR]{green} %t", "Death Enabled");
+			CPrintToChat(client,"{orange}[Deathrun Classic]{green} %t", "Death Enabled");
 			ShowGameText(client, "ico_notify_flag_moving_alt", _, "%t", "Death Enabled");
 		}
 		else if (buttonnum == 1)
@@ -683,13 +706,13 @@ public int BeDeathMenuHandler(Handle menu, MenuAction action, int client, int bu
 			char sPref[2];
 			IntToString(DBD_ON, sPref, sizeof(sPref));
 			SetClientCookie(client, g_DRCookie, sPref);
-			CPrintToChat(client,"{black}[DR]{red} %t", "Death Disabled");
+			CPrintToChat(client,"{orange}[Deathrun Classic]{red} %t", "Death Disabled");
 			ShowGameText(client, "ico_notify_flag_moving_alt", _, "%t", "Death Disabled");
 		}
 		else if (buttonnum == 2)
 		{
 			g_dontBeDeath[client] = DBD_THISMAP;
-			CPrintToChat(client,"{black}[DR]{yellow} %t", "Death Disabled For Map");
+			CPrintToChat(client,"{orange}[Deathrun Classic]{yellow} %t", "Death Disabled For Map");
 			ShowGameText(client, "ico_notify_flag_moving_alt", _, "%t", "Death Disabled For Map");
 		}
 	}
@@ -698,6 +721,58 @@ public int BeDeathMenuHandler(Handle menu, MenuAction action, int client, int bu
 		CloseHandle(menu);
 	}
 }
+
+stock void SetPlayerScore(int client, int points=0, bool killstreak=false)
+{
+	int pts;
+	pts+=points;
+	Event event = CreateEvent("player_escort_score", true);
+	event.SetInt("player", client);
+	event.SetInt("points", points);
+	if(killstreak)
+	{
+		SetEntProp(client, Prop_Send, "m_nStreaks", pts); //increase killstreak!
+	}
+	event.Fire();
+}
+
+// Thirdperson!
+public Action ToggleThirdPerson(int client, int args)
+{
+	if (!IsValidClient(client, false))
+	{
+		return Plugin_Handled;
+	}
+	
+	if(!gAllowThirdPerson)
+	{
+		pThirdPerson[client]=false;
+		SetVariantInt(0);
+		AcceptEntityInput(client, "SetForcedTauntCam");
+		CPrintToChat(client, "{orange}[Deathrun Classic]{default} %t", "Thirdperson Disabled");
+		return Plugin_Handled;
+	}
+	
+	if(pThirdPerson[client]) // turn off thirdperson
+	{
+		pThirdPerson[client]=false;
+		CPrintToChat(client, "{orange}[Deathrun Classic]{default} %t", "Thirdperson Off");
+	}
+	else // turn on thirdperson
+	{
+		pThirdPerson[client]=true;
+		CPrintToChat(client, "{orange}[Deathrun Classic]{default} %t", "Thirdperson On");
+	}
+	SetVariantInt(view_as<int>(pThirdPerson[client]));
+	AcceptEntityInput(client, "SetForcedTauntCam");
+	
+	char sPref[5];
+	IntToString(view_as<int>(pThirdPerson[client]), sPref, sizeof(sPref));
+	SetClientCookie(client, gThirdPersonCmdCookie, sPref);
+			
+	return Plugin_Continue;
+}
+
 
 /* OnPrepartionStart()
 **
@@ -733,12 +808,14 @@ public Action OnRoundStart(Handle event, const char[] name, bool dontBroadcast)
 	if(isValidDrMap)
 	{
 		for(int i = 1; i <= MaxClients; i++)
+		{
 			if(IsValidClient(i, true))
 			{
 					SetEntityMoveType(i, MOVETYPE_WALK);
 					if((GetClientTeam(i) == RUNNERS && g_runner_outline == 0)||(GetClientTeam(i) == DEATH && g_death_outline == 0))
 						SetEntProp(i, Prop_Send, "m_bGlowEnabled", 1);	
 			}
+		}
 		OnStartCountdown = false;
 	}
 }
@@ -758,8 +835,26 @@ public Action OnBroadcast(Event event, const char[] name, bool dontBroadcast)
 
 public Action OnWinPanel(Event event, const char[] name, bool dontBroadcast)
 {
-	//if(isValidDrMap)
-		//return Plugin_Handled;
+	if(isValidDrMap)
+	{
+		if(debugMode)
+		{
+			CPrintToChatAll("[DRC-DEBUG] OnWinPanelEvent");
+		}
+		
+		for(int i = 1; i <= MaxClients; i++)
+		{
+			if(IsValidClient(i, true))
+			{
+				if(GetClientTeam(i)==RUNNERS) // award points to living players
+				{
+					SetPlayerScore(i, 1, true);
+				}
+			}
+		}
+		
+		return Plugin_Continue;
+	}
 	return Plugin_Continue;
 }
 
@@ -931,14 +1026,22 @@ public Action OnPlayerInventory(Handle event, const char[] name, bool dontBroadc
 /* OnPlayerSpawn()
 **
 ** Here we enable the glow (if we need to), we set the spy cloak and we move the death player.
+** we also check if a player's thirdperson setting is enabled
 ** -------------------------------------------------------------------------- */
 public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 {
 	if(isValidDrMap)
 	{
-		int client = GetClientOfUserId(GetEventInt(event, "userid"));
+		int userid = GetEventInt(event, "userid");
+		int client = GetClientOfUserId(userid);
 		if(!IsValidClient(client, true))
 			return Plugin_Continue;
+		
+		if(gAllowThirdPerson && pThirdPerson[client])
+		{
+			CreateTimer(0.2, SetViewOnSpawn, userid);
+		}
+		
 		GetEntPropVector(client, Prop_Send, "m_vecOrigin", pLoc[client]);
 		if(g_MeleeOnly)
 		{
@@ -968,6 +1071,17 @@ public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 	return Plugin_Continue;
 }
 
+public Action SetViewOnSpawn(Handle timer, any userid)
+{
+	int client = GetClientOfUserId(userid);
+	if (IsValidClient(client, true))
+	{
+		SetVariantInt(view_as<int>(pThirdPerson[client]));
+		AcceptEntityInput(client, "SetForcedTauntCam");
+	}
+}
+
+
 
 /* OnPlayerDeath()
 **
@@ -988,7 +1102,7 @@ public Action OnPlayerDeath(Handle event, const char[] name, bool dontBroadcast)
 			SDKUnhook(client, SDKHook_Touch, OnTouch);
 			if(GetClientTeam(client) == RUNNERS && aliveRunners > 1)
 				EmitRandomSound(g_SndOnDeath,client);
-			if(GetClientTeam(client) == RUNNERS && aliveRunners <= 1)
+			if(GetClientTeam(client) == RUNNERS && aliveRunners < 1)
 			{
 				for(int i=1 ; i<=MaxClients ; i++)
 				{
@@ -1005,8 +1119,10 @@ public Action OnPlayerDeath(Handle event, const char[] name, bool dontBroadcast)
 			}	
 			int currentDeath = GetLastPlayer(DEATH);
 			if(currentDeath > 0 && currentDeath <= MaxClients && IsValidClient(client, false))
+			{
 				SetEventInt(event,"attacker",GetClientUserId(currentDeath));
-				
+				SetPlayerScore(currentDeath, 1, true);
+			}	
 			if(g_canEmitSoundToDeath)
 			{
 				if(currentDeath > 0 && currentDeath <= MaxClients)
@@ -1050,7 +1166,7 @@ stock void BalanceTeams()
 		int new_death = GetRandomValid();
 		if(new_death == -1)
 		{
-			CPrintToChatAll("{black}[DR]{red} %t", "Invalid Death");
+			CPrintToChatAll("{orange}[Deathrun Classic]{red} %t", "Invalid Death");
 			return;
 		}
 		previousDeath  = new_death;
@@ -1059,6 +1175,7 @@ stock void BalanceTeams()
 		{
 			if(!IsValidClient(i, false))
 				continue;
+				
 			team = GetClientTeam(i);
 			if(team != DEATH && team != RUNNERS)
 				continue;
@@ -1083,17 +1200,17 @@ stock void BalanceTeams()
 			if(i!=new_death && IsValidClient(new_death, true) && (!IsClientSourceTV(i) || !IsFakeClient(i)))
 			{
 				ShowGameText(i, "ico_notify_flag_moving_alt", _, "%t", "Deathrun Start", new_death);
-				CPrintToChat(i, "{black}[DR]{default} %t", "Deathrun Start", new_death);
+				CPrintToChat(i, "{orange}[Deathrun Classic]{default} %t", "Deathrun Start", new_death);
 			}
 			else
 			{
 				ShowGameText(i, "ico_notify_flag_moving_alt", _, "%t", "Become Death");
-				CPrintToChat(i, "{black}[DR]{default} %t", "Become Death");
+				CPrintToChat(i, "{orange}[Deathrun Classic]{default} %t", "Become Death");
 			}
 		}
 		if(!IsClientConnected(new_death) || !IsClientInGame(new_death)) 
 		{
-			CPrintToChatAll("{black}[DR]{red} %t","Death Not Connected");
+			CPrintToChatAll("{orange}[Deathrun Classic]{red} %t","Death Not Connected");
 			return;
 		}
 		g_timesplayed_asdeath[previousDeath]++;
@@ -1101,7 +1218,7 @@ stock void BalanceTeams()
 	}
 	else
 	{
-		CPrintToChatAll("{black}[DR]{red} %t", "Not Enough Players");
+		CPrintToChatAll("{orange}[Deathrun Classic]{red} %t", "Not Enough Players");
 	}
 }
 
@@ -1363,9 +1480,9 @@ public Action Command_Block(int client, const char[] command, int argc)
 		GetTrieValue(g_CmdBlockOnlyOnPrep,command,PreparationOnly);
 		
 		// this is to fix activators suiciding via any means. Activated by default
-		if(IsSuicide(client, command) && GetClientTeam(client)==DEATH)
+		if(IsSuicide(client, command) && GetClientTeam(client)==DEATH && blockDeathSuicide)
 		{	
-			CPrintToChat(client, "{black}[DR]{red}%t", "Suicide Blocked");
+			CPrintToChat(client, "{orange}[Deathrun Classic]{red}%t", "Suicide Blocked");
 			return Plugin_Stop;
 		}
 		
@@ -1542,7 +1659,11 @@ stock bool IsPlayerMoving(int client)
 {
 	float vClientVelocity[3];
 	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vClientVelocity);
-	PrintCenterTextAll("Debug: X: %f, Y: %f, Z: %f", vClientVelocity[0],vClientVelocity[1],vClientVelocity[2]);
+	
+	if(debugMode)
+	{
+		PrintCenterText(client, "Debug: X: %f, Y: %f, Z: %f", vClientVelocity[0],vClientVelocity[1],vClientVelocity[2]);
+	}
 	if(vClientVelocity[0]==0.0 && vClientVelocity[1]==0.0)
 	{
 		return false;

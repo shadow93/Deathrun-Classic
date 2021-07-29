@@ -16,12 +16,6 @@
 		"en"		"You are the last runner!"
 		"es"		"¡Eres el ultimo corredor!"
 	}
-	"Freerun" // When a player activates freerun!
-	{
-		"#format" "{1:N}"
-		"en"		"{1} has shown mercy and has granted you a freerun!"
-		"es"		"¡{1} ha dado una carrera libre!"
-	}
 	"Suicide Blocked" // Notify Death that they cannot suicide
 	{
 		"en"		"You cannot suicide or change teams as death!"
@@ -66,5 +60,20 @@
 	{
 		"en"		"You were stuck so you were respawned!"
 		"es"		"¡Estuviste atascado, así que te regeneraste!"
+	}
+	"Thirdperson On"
+	{
+		"en"		"Thirdperson on!"
+		"es"		"¡Modo tercer persona encendido!"
+	}	
+	"Thirdperson Off"
+	{
+		"en"		"Thirdperson off!"
+		"es"		"¡Modo tercer persona apagado!"
+	}	
+	"Thirdperson Disabled"
+	{
+		"en"		"The host does not allow thirdperson!"
+		"es"		"¡El anfitrión no permite el uso de tercer persona!"
 	}
 }
