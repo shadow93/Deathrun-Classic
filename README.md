@@ -7,6 +7,7 @@
 - Show version number on game description
 - Integrated thirdperson - persistent setting (remembers your thirdperson setting if you DC then later reconnect, as well as between map changes)
 - Grant death points for kills, grant surviving runners points if they win
+- Living spectator glitch fix (this was witnessed on the OutPost's deathrun server).
 
 
 ## HandleStuckPlayers
