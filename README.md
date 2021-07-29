@@ -6,8 +6,6 @@
 - Replace SteamTools with SteamWorks for setting game description!
 - Show version number on game description
 
-This build has an option for checking for stuck players.
-
 
 ## HandleStuckPlayers
 
