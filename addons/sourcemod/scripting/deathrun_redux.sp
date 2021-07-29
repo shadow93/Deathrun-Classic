@@ -792,9 +792,13 @@ public Action OnPrepartionStart(Handle event, const char[] name, bool dontBroadc
 		
 		//Players shouldn't move until the round starts
 		for(int i = 1; i <= MaxClients; i++)
+		{
 			if(IsValidClient(i, true))
-				SetEntityMoveType(i, MOVETYPE_NONE);	
-
+			{
+				SetEntityMoveType(i, MOVETYPE_NONE);
+				CheckForLivingSpectators(i, i==GetLastPlayer(DEATH) ? DEATH : RUNNERS);
+			}
+		}
 		EmitRandomSound(g_SndRoundStart);
 	}
 }
@@ -1294,6 +1298,28 @@ bool CanClientBeDeath(int client)
         return false;
     }
 } 
+
+stock void CheckForLivingSpectators(int client, int team)
+{
+	int class=GetEntProp(client, Prop_Send, "m_iDesiredPlayerClass");
+	int randomclass=GetRandomInt(1,9);
+	if(!class)  //Living spectator check: 0 means that no class is selected
+	{
+		LogError("[Deathrun Classic] %N does not have a class assigned, picking a class...", client);
+		SetEntProp(client, Prop_Send, "m_iDesiredPlayerClass", randomclass);  // Living Spectator have no class assigned, assign one!
+	}
+	SetEntProp(client, Prop_Send, "m_lifeState", 2);
+	ChangeClientTeam(client, team);
+	TF2_RespawnPlayer(client);
+
+	if(GetEntProp(client, Prop_Send, "m_iObserverMode") && IsPlayerAlive(client))  // living spectator!
+	{
+		LogError("[Deathrun Classic] %N is a living spectator! Attempting to pick a class...", client);
+		TF2_SetPlayerClass(client, view_as<TFClassType>(randomclass));
+		TF2_RespawnPlayer(client);
+	}
+}
+
 
 /* GetMinTimesPlayed()
 **
