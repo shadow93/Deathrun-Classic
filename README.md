@@ -30,6 +30,8 @@
 		"HandleStuckPlayers" "2" // Checks for stuck players and takes action if someone is stuck. 0 = disable, 1 = slay, 2 = tele to prev location, 3 = respawn
 		"AllowThirdPerson"	"1" // Thirdperson: 0 - disable, 1 - enable
 		
+		"DebugMode"	"1"	// Debug Mode: 0 - disabled, 1 - enabled
+		
 		//Speed of every team (for reference, pyro's base speed is 300).
 		"speed"
 		{
