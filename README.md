@@ -1,5 +1,5 @@
-# This branch is for long-term support releases.
-### Updates on this branch are only hotfixes to address bugs and therefore, less frequent than the stable branch!
+# This branch is for long-term support releases
+Unlike stable, LTS releases will only see hotfixes and no new feature updates.
 
 # Changelog
  - Living spectator fix
