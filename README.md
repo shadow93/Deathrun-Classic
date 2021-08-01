@@ -1,5 +1,6 @@
-# Deathrun-Classic
-### A continuation of ClassicGuzzi's Deathrun Redux plugin
+### ClassicGuzzi's Deathrun Redux is now....
+
+# Deathrun Classic!
 
 ### Main features:
 - Global configuration file (data/deathrun/deathrun/cfg) or map-specific configuration (data/deathrun/maps/[mapname].cfg)
