@@ -7,13 +7,13 @@
 #include <sdkhooks>
 #include <tf2_stocks>
 #include <tf2items>
-#include <steamtools>
+#include <SteamWorks>
 #include <clientprefs>
 
 #pragma newdecls required
 
 // ---- Defines ----------------------------------------------------------------
-#define DR_VERSION "0.3b"
+#define DR_VERSION "0.31"
 #define PLAYERCOND_SPYCLOAK (1<<4)
 #define MAXGENERIC 25	//Used as a limit in the config file
 
@@ -98,7 +98,7 @@ int dr_push_def = 0;
 // ---- Plugin's Information ---------------------------------------------------
 public Plugin myinfo =
 {
-	name = "[TF2] Deathrun Redux",
+	name = "[TF2] Deathrun Classic",
 	author = "93SHADoW, Classic",
 	description	= "Deathrun plugin for TF2",
 	version = DR_VERSION,
@@ -186,7 +186,11 @@ public void OnMapStart()
 	{
 		LogMessage("Deathrun map detected. Enabling Deathrun Gamemode.");
 		isValidDrMap = true;
-		Steam_SetGameDescription("DeathRun Redux");
+		
+		char gameDesc[PLATFORM_MAX_PATH];
+		FormatEx(gameDesc, sizeof(gameDesc), "Deathrun Classic (%s)", DR_VERSION);
+		SteamWorks_SetGameDescription(gameDesc);
+		
 		AddServerTag("deathrun");
 		for (int i = 1; i <= MaxClients; i++)
 		{
@@ -202,7 +206,7 @@ public void OnMapStart()
 	{
 		LogMessage("Current map is not a deathrun map. Disabling Deathrun Gamemode.");
 		isValidDrMap = false;
-		Steam_SetGameDescription("Team Fortress");	
+		SteamWorks_SetGameDescription("Team Fortress");	
 		RemoveServerTag("deathrun");
 	}
 }
@@ -703,9 +707,13 @@ public Action OnPrepartionStart(Handle event, const char[] name, bool dontBroadc
 		
 		//Players shouldn't move until the round starts
 		for(int i = 1; i <= MaxClients; i++)
+		{
 			if(IsValidClient(i, true))
+			{
 				SetEntityMoveType(i, MOVETYPE_NONE);	
-
+				CheckForLivingSpectators(i, i==GetLastPlayer(DEATH) ? DEATH : RUNNERS);
+			}
+		}
 		EmitRandomSound(g_SndRoundStart);
 	}
 }
@@ -956,28 +964,31 @@ public Action OnPlayerDeath(Handle event, const char[] name, bool dontBroadcast)
 		
 		if(IsValidClient(client,false)) // we want to make sure this is a valid client
 		{
+			int currentDeath = GetLastPlayer(DEATH);
 			SetEntProp(client, Prop_Send, "m_bGlowEnabled", 0);
 			SDKUnhook(client, SDKHook_PreThink, GameLogic_Prethink);
 			SDKUnhook(client, SDKHook_OnTakeDamage, OnTakeDamage);
 			
-			if(GetClientTeam(client) == RUNNERS && aliveRunners > 1)
-				EmitRandomSound(g_SndOnDeath,client);
-			if(GetClientTeam(client) == RUNNERS && aliveRunners <= 1)
+			if(client != currentDeath)
 			{
-				for(int i=1 ; i<=MaxClients ; i++)
+				if(GetClientTeam(client) == RUNNERS && aliveRunners > 1)
+					EmitRandomSound(g_SndOnDeath,client);
+				if(GetClientTeam(client) == RUNNERS && aliveRunners < 1)
 				{
-					if(IsValidClient(i,false) && GetClientTeam(i) == RUNNERS)
+					for(int i=1 ; i<=MaxClients ; i++)
 					{
-						EmitRandomSound(g_SndOnLastManDeath,i);
+						if(IsValidClient(i,false) && GetClientTeam(i) == RUNNERS)
+						{
+							EmitRandomSound(g_SndOnLastManDeath,i);
+						}
 					}
 				}
+				if(aliveRunners == 1)
+				{
+					EmitRandomSound(g_SndLastAlive,GetLastPlayer(RUNNERS,client));
+					ShowGameText(GetLastPlayer(RUNNERS,client), "ico_notify_flag_moving_alt", _, "%t", "Last Survivor");
+				}
 			}
-			if(aliveRunners == 1)
-			{
-				EmitRandomSound(g_SndLastAlive,GetLastPlayer(RUNNERS,client));
-				ShowGameText(GetLastPlayer(RUNNERS,client), "ico_notify_flag_moving_alt", _, "%t", "Last Survivor");
-			}	
-			int currentDeath = GetLastPlayer(DEATH);
 			if(currentDeath > 0 && currentDeath <= MaxClients && IsValidClient(client, false))
 				SetEventInt(event,"attacker",GetClientUserId(currentDeath));
 				
@@ -1128,7 +1139,7 @@ public int GetRandomValid()
 
 /*
 **
-** spectator glitch fix by abrandnewday
+** spectator glitch fix by abrandnewday & from the Freak Fortress 2 source
 **
 */
 bool CanClientBeDeath(int client)
@@ -1151,6 +1162,27 @@ bool CanClientBeDeath(int client)
         return false;
     }
 } 
+
+stock void CheckForLivingSpectators(int client, int team)
+{
+	int class=GetEntProp(client, Prop_Send, "m_iDesiredPlayerClass");
+	int randomclass=GetRandomInt(1,9);
+	if(!class)  //Living spectator check: 0 means that no class is selected
+	{
+		LogError("[Deathrun Classic] %N does not have a class assigned, picking a class...", client);
+		SetEntProp(client, Prop_Send, "m_iDesiredPlayerClass", randomclass);  // Living Spectator have no class assigned, assign one!
+	}
+	SetEntProp(client, Prop_Send, "m_lifeState", 2);
+	ChangeClientTeam(client, team);
+	TF2_RespawnPlayer(client);
+
+	if(GetEntProp(client, Prop_Send, "m_iObserverMode") && IsPlayerAlive(client))  // living spectator!
+	{
+		LogError("[Deathrun Classic] %N is a living spectator! Attempting to pick a class...", client);
+		TF2_SetPlayerClass(client, view_as<TFClassType>(randomclass));
+		TF2_RespawnPlayer(client);
+	}
+}
 
 /* GetMinTimesPlayed()
 **

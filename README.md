@@ -18,7 +18,7 @@
 
 ### Dependencies:
 - TF2Items (for weapon restrictions)
-- SteamTools (for game name change in server browser)
+- SteamWorks (for game name change in server browser)
 	
 ### Installation:
 - deathrun_redux.smx > tf/addons/sourcemod/plugins/
