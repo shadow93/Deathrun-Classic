@@ -13,7 +13,7 @@
 #pragma newdecls required
 
 // ---- Defines ----------------------------------------------------------------
-#define DR_VERSION "0.31"
+#define DR_VERSION "0.31 LTS (Rev 0)"
 #define PLAYERCOND_SPYCLOAK (1<<4)
 #define MAXGENERIC 25	//Used as a limit in the config file
 
