@@ -13,7 +13,7 @@
 #pragma newdecls required
 
 // ---- Defines ----------------------------------------------------------------
-#define DR_VERSION "0.31 LTS (Rev 0)"
+#define DR_VERSION "Rev 0"
 #define PLAYERCOND_SPYCLOAK (1<<4)
 #define MAXGENERIC 25	//Used as a limit in the config file
 
@@ -98,7 +98,7 @@ int dr_push_def = 0;
 // ---- Plugin's Information ---------------------------------------------------
 public Plugin myinfo =
 {
-	name = "[TF2] Deathrun Classic",
+	name = "[TF2] Deathrun Classic LTS",
 	author = "93SHADoW, Classic",
 	description	= "Deathrun plugin for TF2",
 	version = DR_VERSION,
@@ -188,7 +188,7 @@ public void OnMapStart()
 		isValidDrMap = true;
 		
 		char gameDesc[PLATFORM_MAX_PATH];
-		FormatEx(gameDesc, sizeof(gameDesc), "Deathrun Classic (%s)", DR_VERSION);
+		FormatEx(gameDesc, sizeof(gameDesc), "Deathrun Classic LTS (%s)", DR_VERSION);
 		SteamWorks_SetGameDescription(gameDesc);
 		
 		AddServerTag("deathrun");
