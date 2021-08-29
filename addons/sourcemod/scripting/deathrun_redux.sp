@@ -13,7 +13,7 @@
 #pragma newdecls required
 
 // ---- Defines ----------------------------------------------------------------
-#define DR_VERSION "Rev 0"
+#define DR_VERSION "Rev 1"
 #define PLAYERCOND_SPYCLOAK (1<<4)
 #define MAXGENERIC 25	//Used as a limit in the config file
 
@@ -1163,14 +1163,20 @@ bool CanClientBeDeath(int client)
     }
 } 
 
+/*
+**
+** We are checking for living spectators here.....
+**
+*/
+
 stock void CheckForLivingSpectators(int client, int team)
 {
-	int class=GetEntProp(client, Prop_Send, "m_iDesiredPlayerClass");
-	int randomclass=GetRandomInt(1,9);
+	TFClassType class=TF2_GetPlayerClass(client);
+	TFClassType randomclass=view_as<TFClassType>(GetRandomInt(1,9));
 	if(!class)  //Living spectator check: 0 means that no class is selected
 	{
 		LogError("[Deathrun Classic] %N does not have a class assigned, picking a class...", client);
-		SetEntProp(client, Prop_Send, "m_iDesiredPlayerClass", randomclass);  // Living Spectator have no class assigned, assign one!
+		TF2_SetPlayerClass(client, randomclass);
 	}
 	SetEntProp(client, Prop_Send, "m_lifeState", 2);
 	ChangeClientTeam(client, team);
@@ -1179,7 +1185,7 @@ stock void CheckForLivingSpectators(int client, int team)
 	if(GetEntProp(client, Prop_Send, "m_iObserverMode") && IsPlayerAlive(client))  // living spectator!
 	{
 		LogError("[Deathrun Classic] %N is a living spectator! Attempting to pick a class...", client);
-		TF2_SetPlayerClass(client, view_as<TFClassType>(randomclass));
+		TF2_SetPlayerClass(client, randomclass);
 		TF2_RespawnPlayer(client);
 	}
 }
@@ -1239,7 +1245,7 @@ public void GameLogic_Prethink(int client)
 
 public Action OnTakeDamage(int client, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
-	if(isValidDrMap && blockFallDamage && (damagetype & DMG_FALL)) // cancel fall damage
+	if(isValidDrMap && blockFallDamage && attacker==client && (damagetype & DMG_FALL)) // cancel fall damage
 	{
 		return Plugin_Stop;
 	}
