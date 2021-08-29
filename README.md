@@ -3,12 +3,8 @@
 ## Currently Testing
 
 - Stuck Player Checker - it will automatically detect if a player is stuck! (can be also set on a per-map basis)
-- Replace SteamTools with SteamWorks for setting game description!
-- Show version number on game description
 - Integrated thirdperson - persistent setting (remembers your thirdperson setting if you DC then later reconnect, as well as between map changes)
 - Grant death points for kills, grant surviving runners points if they win
-- Living spectator glitch fix (this was witnessed on the Outpost's deathrun server).
-
 
 ## HandleStuckPlayers
 
