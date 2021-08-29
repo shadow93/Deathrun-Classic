@@ -13,7 +13,7 @@
 #pragma newdecls required
 
 // ---- Defines ----------------------------------------------------------------
-#define DR_VERSION "0.3.1"
+#define DR_VERSION "0.4"
 #define PLAYERCOND_SPYCLOAK (1<<4)
 #define MAXGENERIC 25	//Used as a limit in the config file
 
@@ -25,6 +25,9 @@
 #define DBD_ON 2
 #define DBD_THISMAP 3 // The cookie will never have this value
 #define TIME_TO_ASK 30.0 //Delay between asking the client its preferences and it's connection/join.
+
+#define SOLID_NONE 4
+#define FSOLID_NOT_SOLID 0x0004
 
 #define INACTIVE 100000000.0
 
@@ -106,6 +109,10 @@ int dr_push_def = 0;
 
 bool debugMode;
 
+ArrayList mlist = null;
+int mlistserial = -1;
+static bool migitate=false;
+
 // ---- Plugin's Information ---------------------------------------------------
 public Plugin myinfo =
 {
@@ -178,6 +185,10 @@ public void OnPluginStart()
 	
 	//End of round events
 	HookEvent("arena_win_panel", OnWinPanel, EventHookMode_Pre);
+	
+	// a very important migitation if a map has a fatal issue
+	int arraySize = ByteCountToCells(PLATFORM_MAX_PATH);	
+	mlist = new ArrayList(arraySize);
 }
 
 /* OnPluginEnd()
@@ -230,6 +241,67 @@ public void OnMapStart()
 		SteamWorks_SetGameDescription("Team Fortress");	
 		RemoveServerTag("deathrun");
 	}
+}
+
+/* OnEntityCreated()
+**
+** This contains a very important migitation specific to
+** dr_playstation related to the "bud card" and the "bud room"
+**
+** The bud card causes the server to crash if shredded, we want to remove the ability to shred the bud card!
+**
+*/
+public void OnGameFrame()
+{
+	if(isValidDrMap)
+	{
+		for (int ent=2044;ent <= 2048; ent++) 
+		{
+			if (!IsValidEntityOrEdict(ent))
+			{
+				continue;
+			}
+			AcceptEntityInput(ent, "Kill");
+			if(migitate)
+			{
+				migitate=false;
+				char map[PLATFORM_MAX_PATH];
+				GetCurrentMap(map, sizeof(map));
+				LogError("[Deathrun Classic] The current map %s has experienced a fatal edict error (exceeded the maximum allowed edicts). Please contact the map maker to address this issue!", map);
+				if(!GetNextMap(map, sizeof(map)))
+				{
+					char newmap[PLATFORM_MAX_PATH];
+					int b = GetRandomInt(0, mlist.Length - 1);
+					mlist.GetString(b, map, sizeof(map));
+					FindMap(map, newmap, sizeof(newmap));
+				}
+				ForceChangeLevel(map, "[Deathrun Classic] Switching maps..");
+			}
+		}
+	}
+}
+
+stock bool IsValidEntityOrEdict(int entity)
+{
+	return (IsValidEntity(entity) || IsValidEdict(entity));
+}
+
+public void OnEntityCreated(int entity, const char[] classname)
+{
+	if(isValidDrMap)
+	{
+		if(entity >= 2044 && !migitate)
+		{
+			SDKHookEx(entity, SDKHook_Spawn, OnEntitySpawn);
+			migitate=true;
+		}
+	}
+}
+
+public Action OnEntitySpawn(int entity)
+{
+	AcceptEntityInput(entity, "Kill");
+	return Plugin_Handled;
 }
 
 /* OnMapEnd()
@@ -816,6 +888,10 @@ public Action OnRoundStart(Handle event, const char[] name, bool dontBroadcast)
 			if(IsValidClient(i, true))
 			{
 					SetEntityMoveType(i, MOVETYPE_WALK);
+					
+					// ensure there are no living spectators, again...
+					CheckForLivingSpectators(i, i==GetLastPlayer(DEATH) ? DEATH : RUNNERS);
+					
 					if((GetClientTeam(i) == RUNNERS && g_runner_outline == 0)||(GetClientTeam(i) == DEATH && g_death_outline == 0))
 						SetEntProp(i, Prop_Send, "m_bGlowEnabled", 1);	
 			}
@@ -1100,33 +1176,34 @@ public Action OnPlayerDeath(Handle event, const char[] name, bool dontBroadcast)
 		
 		if(IsValidClient(client,false)) // we want to make sure this is a valid client
 		{
+			int currentDeath = GetLastPlayer(DEATH);
 			SetEntProp(client, Prop_Send, "m_bGlowEnabled", 0);
 			SDKUnhook(client, SDKHook_PreThink, GameLogic_Prethink);
 			SDKUnhook(client, SDKHook_OnTakeDamage, OnTakeDamage);
-			SDKUnhook(client, SDKHook_Touch, OnTouch);
-			if(GetClientTeam(client) == RUNNERS && aliveRunners > 1)
-				EmitRandomSound(g_SndOnDeath,client);
-			if(GetClientTeam(client) == RUNNERS && aliveRunners < 1)
+			
+			if(client != currentDeath)
 			{
-				for(int i=1 ; i<=MaxClients ; i++)
+				if(GetClientTeam(client) == RUNNERS && aliveRunners > 1)
+					EmitRandomSound(g_SndOnDeath,client);
+				if(GetClientTeam(client) == RUNNERS && aliveRunners < 1)
 				{
-					if(IsValidClient(i,false) && GetClientTeam(i) == RUNNERS)
+					for(int i=1 ; i<=MaxClients ; i++)
 					{
-						EmitRandomSound(g_SndOnLastManDeath,i);
+						if(IsValidClient(i,false) && GetClientTeam(i) == RUNNERS)
+						{
+							EmitRandomSound(g_SndOnLastManDeath,i);
+						}
 					}
 				}
+				if(aliveRunners == 1)
+				{
+					EmitRandomSound(g_SndLastAlive,GetLastPlayer(RUNNERS,client));
+					ShowGameText(GetLastPlayer(RUNNERS,client), "ico_notify_flag_moving_alt", _, "%t", "Last Survivor");
+				}
 			}
-			if(aliveRunners == 1)
-			{
-				EmitRandomSound(g_SndLastAlive,GetLastPlayer(RUNNERS,client));
-				ShowGameText(GetLastPlayer(RUNNERS,client), "ico_notify_flag_moving_alt", _, "%t", "Last Survivor");
-			}	
-			int currentDeath = GetLastPlayer(DEATH);
 			if(currentDeath > 0 && currentDeath <= MaxClients && IsValidClient(client, false))
-			{
 				SetEventInt(event,"attacker",GetClientUserId(currentDeath));
-				SetPlayerScore(currentDeath, 1, true);
-			}	
+				
 			if(g_canEmitSoundToDeath)
 			{
 				if(currentDeath > 0 && currentDeath <= MaxClients)
@@ -1299,14 +1376,20 @@ bool CanClientBeDeath(int client)
     }
 } 
 
+/*
+**
+** We are checking for living spectators here.....
+**
+*/
+
 stock void CheckForLivingSpectators(int client, int team)
 {
-	int class=GetEntProp(client, Prop_Send, "m_iDesiredPlayerClass");
-	int randomclass=GetRandomInt(1,9);
+	TFClassType class=TF2_GetPlayerClass(client);
+	TFClassType randomclass=view_as<TFClassType>(GetRandomInt(1,9));
 	if(!class)  //Living spectator check: 0 means that no class is selected
 	{
 		LogError("[Deathrun Classic] %N does not have a class assigned, picking a class...", client);
-		SetEntProp(client, Prop_Send, "m_iDesiredPlayerClass", randomclass);  // Living Spectator have no class assigned, assign one!
+		TF2_SetPlayerClass(client, randomclass);
 	}
 	SetEntProp(client, Prop_Send, "m_lifeState", 2);
 	ChangeClientTeam(client, team);
@@ -1315,7 +1398,7 @@ stock void CheckForLivingSpectators(int client, int team)
 	if(GetEntProp(client, Prop_Send, "m_iObserverMode") && IsPlayerAlive(client))  // living spectator!
 	{
 		LogError("[Deathrun Classic] %N is a living spectator! Attempting to pick a class...", client);
-		TF2_SetPlayerClass(client, view_as<TFClassType>(randomclass));
+		TF2_SetPlayerClass(client, randomclass);
 		TF2_RespawnPlayer(client);
 	}
 }
@@ -1378,7 +1461,7 @@ public void GameLogic_Prethink(int client)
 
 public Action OnTakeDamage(int client, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
-	if(isValidDrMap && blockFallDamage && (damagetype & DMG_FALL)) // cancel fall damage
+	if(isValidDrMap && blockFallDamage && attacker==client && (damagetype & DMG_FALL)) // cancel fall damage
 	{
 		return Plugin_Stop;
 	}
@@ -1441,6 +1524,15 @@ public void OnConfigsExecuted()
 	dr_scrambleauto_def = GetConVarInt(dr_scrambleauto);
 	dr_airdash_def = GetConVarInt(dr_airdash);
 	dr_push_def = GetConVarInt(dr_push);
+	
+	// required for anti-crash migitation
+	if (ReadMapList(mlist, mlistserial, "randomcycle", MAPLIST_FLAG_CLEARARRAY|MAPLIST_FLAG_MAPSFOLDER)== null)
+	{
+		if (mlistserial == -1)
+		{
+			LogError("[Deathrun Classic] A valid map list is required for anti-crash migitation!");
+		}
+	}
 }
 
 /* SetupCvars()
@@ -1626,7 +1718,7 @@ public Action OnTouch(int client, int other)
 {
 	if(gCheckStuckPlayers)
 	{
-		if(IsPlayerStuck(client))
+		if(IsPlayerStuck(client) && IsEntitySolid(other) && !IsSameLocation(client, pLoc[client]))
 		{
 			HandleStuckPlayer(client, gCheckStuckPlayers, pLoc[client]);
 			return Plugin_Continue;
@@ -1638,6 +1730,22 @@ public Action OnTouch(int client, int other)
 	}
 	return Plugin_Continue;
 }
+
+stock bool IsSameLocation(int entity, float location[3])
+{
+	float xyz[3];
+	GetEntPropVector(entity, Prop_Send, "m_vecOrigin", xyz);
+	if(xyz[0] == location[0] && xyz[1] == location[1] && xyz[2] == location[2])
+	{
+		return true;
+	}
+	return false;
+}
+
+stock bool IsEntitySolid(int entity)
+{
+    return (GetEntProp(entity, Prop_Send, "m_nSolidType", 1) != SOLID_NONE && !(GetEntProp(entity, Prop_Send, "m_usSolidFlags", 2) & FSOLID_NOT_SOLID));
+} 
 
 
 stock void HandleStuckPlayer(int client, int action, float location[3])
