@@ -107,6 +107,8 @@ int dr_scrambleauto_def = 0;
 int dr_airdash_def = 0;
 int dr_push_def = 0;
 
+ConVar cvarTags;
+
 bool debugMode;
 
 ArrayList mlist = null;
@@ -1161,8 +1163,6 @@ public Action SetViewOnSpawn(Handle timer, any userid)
 	}
 }
 
-
-
 /* OnPlayerDeath()
 **
 ** Here we reproduce sounds if needed and activate the glow effect if needed
@@ -1541,6 +1541,8 @@ public void OnConfigsExecuted()
 ** -------------------------------------------------------------------------- */
 public void SetupCvars()
 {
+	cvarTags = FindConVar("sv_tags");
+	
 	SetConVarInt(dr_queue, 0);
 	SetConVarInt(dr_unbalance, 0);
 	SetConVarInt(dr_autobalance, 0);
@@ -1548,6 +1550,16 @@ public void SetupCvars()
 	SetConVarInt(dr_scrambleauto, 0);
 	SetConVarInt(dr_airdash, 0);
 	SetConVarInt(dr_push, 0);
+	
+	//Add custom tags
+	MyServerTag("dr", false);
+	MyServerTag("deathrun", false);
+	MyServerTag("deadrun", false);
+	MyServerTag("dead run", false);
+	MyServerTag("death run", false);
+	MyServerTag("death", false);
+	MyServerTag("drun", false);
+	MyServerTag("run", false);
 }
 
 /* ResetCvars()
@@ -1576,6 +1588,67 @@ public void ResetCvars()
 	ClearTrie(g_SndOnKill);
 	ClearTrie(g_SndLastAlive);
 	ClearTrie(g_SndOnLastManDeath);
+	
+	//Remove custom tags
+	MyServerTag("dr", true);
+	MyServerTag("deathrun", true);
+	MyServerTag("deadrun", true);
+	MyServerTag("dead run", true);
+	MyServerTag("death run", true);
+	MyServerTag("death", true);
+	MyServerTag("drun", true);
+	MyServerTag("run", true);
+}
+
+// add/remove custom servertags!
+public void MyServerTag(const char[] tag, bool remove)
+{
+	if(remove)
+	{
+		MyAddServerTag(tag);
+	}
+	else
+	{
+		MyRemoveServerTag(tag);
+	}
+
+}
+
+// from FF2
+stock void MyAddServerTag(const char[] tag)
+{
+	if(cvarTags == view_as<ConVar>(INVALID_HANDLE))
+		return;
+
+	static char currtags[128];
+	cvarTags.GetString(currtags, sizeof(currtags));
+	if(StrContains(currtags, tag) > -1)
+		return;
+
+	char newtags[128];
+	FormatEx(newtags, sizeof(newtags), "%s%s%s", currtags, currtags[0] ? "," : "", tag);
+	int flags = GetConVarFlags(cvarTags);
+	SetConVarFlags(cvarTags, flags & ~FCVAR_NOTIFY);
+	cvarTags.SetString(newtags);
+	SetConVarFlags(cvarTags, flags);
+}
+
+stock void MyRemoveServerTag(const char[] tag)
+{
+	if(cvarTags == view_as<ConVar>(INVALID_HANDLE))
+		return;
+
+	static char newtags[128];
+	cvarTags.GetString(newtags, sizeof(newtags));
+	if(StrContains(newtags, tag) == -1)
+		return;
+
+	ReplaceString(newtags, sizeof(newtags), tag, "");
+	ReplaceString(newtags, sizeof(newtags), ",,", "");
+	int flags = GetConVarFlags(cvarTags);
+	SetConVarFlags(cvarTags, flags & ~FCVAR_NOTIFY);
+	cvarTags.SetString(newtags);
+	SetConVarFlags(cvarTags, flags);
 }
 
 // needed to determine if player is valid
